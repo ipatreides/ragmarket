@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versão (tag) ex.: v0.1.0"
+        required: true
+        type: string
+      prerelease:
+        description: "Pré-release?"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Setup Rust (stable MSVC)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Verify WinDivert binaries present
+        shell: pwsh
+        run: |
+          $required = @(
+            "src-tauri/resources/x64/WinDivert.dll",
+            "src-tauri/resources/x64/WinDivert.lib",
+            "src-tauri/resources/x64/WinDivert64.sys"
+          )
+          foreach ($f in $required) {
+            if (-not (Test-Path $f)) {
+              Write-Error "Missing: $f"
+              exit 1
+            }
+            Write-Output "OK: $f"
+          }
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build Tauri (release)
+        run: npm run tauri build
+
+      - name: Stage release artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          # Standalone exe + bundled WinDivert files (needed at runtime)
+          Copy-Item src-tauri/target/release/ragmarket.exe "artifacts/ragmarket-${{ inputs.version }}.exe"
+          Copy-Item src-tauri/resources/x64/WinDivert.dll artifacts/
+          Copy-Item src-tauri/resources/x64/WinDivert64.sys artifacts/
+          # Installers (filenames include Tauri's own version, copy as-is)
+          if (Test-Path src-tauri/target/release/bundle/msi) {
+            Copy-Item src-tauri/target/release/bundle/msi/*.msi artifacts/
+          }
+          if (Test-Path src-tauri/target/release/bundle/nsis) {
+            Copy-Item src-tauri/target/release/bundle/nsis/*.exe artifacts/
+          }
+          Write-Output "=== Release artifacts ==="
+          Get-ChildItem artifacts | Format-Table Name, Length
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}".TrimStart("v")
+          $content = Get-Content CHANGELOG.md -Raw
+          # Capture everything between `## [<version>]` and the next `## [` heading
+          $pattern = "(?ms)^## \[$([regex]::Escape($version))\][^\n]*\n(.*?)(?=^## \[|\Z)"
+          $m = [regex]::Match($content, $pattern)
+          if ($m.Success) {
+            $body = $m.Groups[1].Value.Trim()
+          } else {
+            $body = "Veja o CHANGELOG.md para detalhes."
+          }
+          $tmp = New-TemporaryFile
+          Set-Content -Path $tmp -Value $body -Encoding utf8
+          Write-Output "body_file=$tmp" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version }}
+          name: ${{ inputs.version }}
+          body_path: ${{ steps.notes.outputs.body_file }}
+          prerelease: ${{ inputs.prerelease }}
+          files: |
+            artifacts/*
