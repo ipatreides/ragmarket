@@ -12,11 +12,31 @@ atravessada.
 
 [**ragmarket-v0.1.0-setup.exe**](https://github.com/adsonpleal/ragmarket/releases/latest/download/ragmarket-v0.1.0-setup.exe)
 — instalador único para Windows 10/11 (~10 MB). Já inclui o WinDivert
-embutido; basta executar e seguir o instalador. Depois de instalado, rode o
-Ragmarket pelo atalho do menu Iniciar **como Administrador**.
+embutido; basta executar e seguir o instalador. O Ragmarket é configurado
+para sempre rodar como Administrador (vai aparecer um UAC ao iniciar — isso
+é necessário pra capturar pacotes de rede).
 
 Veja também a [página de releases](https://github.com/adsonpleal/ragmarket/releases)
 para versões anteriores e o `SHA256SUMS.txt` correspondente.
+
+### ⚠ Aviso do SmartScreen "Windows protegeu seu PC"
+
+Como o binário **não tem assinatura digital paga**, na primeira execução o
+Windows SmartScreen vai mostrar o aviso "**Windows protected your PC** —
+Microsoft Defender SmartScreen prevented an unrecognized app from starting".
+
+**Como instalar mesmo assim:**
+
+1. Clique em **"More info"** (Mais informações) no diálogo
+2. Aparece um botão **"Run anyway"** (Executar mesmo assim) no canto inferior — clique nele
+3. O instalador roda normalmente
+
+Esse aviso só aparece porque o `.exe` ainda não acumulou reputação no
+Microsoft Application Reputation Service (precisaria de muitos downloads
+sem detecções, ou um certificado de assinatura EV, que custa caro). O
+binário é compilado direto do código-fonte aberto deste repositório via
+GitHub Actions — se quiser verificar a integridade, compare o hash do
+arquivo baixado com o `SHA256SUMS.txt` da mesma release.
 
 ---
 
