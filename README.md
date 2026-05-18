@@ -159,7 +159,7 @@ Causas possíveis, em ordem de probabilidade:
 ## Stack
 
 - **Tauri 2** — produz um `.exe` standalone de ~10-15 MB
-- **Rust** (backend) — captura de pacotes via WinDivert (modo *sniff*)
+- **Rust** (backend) — captura de pacotes via [WinDivert](https://github.com/basil00/WinDivert) (modo *sniff*)
 - **React + TypeScript + Vite** (frontend)
 - **TanStack Table** para a grade de resultados
 
@@ -170,8 +170,9 @@ Causas possíveis, em ordem de probabilidade:
 - Windows 11 SDK (ex.: `10.0.26100.0`) via Visual Studio Installer
 - Node.js 20+
 - Visual Studio C++ Build Tools (com `vcvars64.bat`)
-- WinDivert 2.x — os binários (`WinDivert.dll`, `WinDivert64.sys`,
-  `WinDivert.lib`) ficam em `src-tauri/resources/x64/`
+- [WinDivert](https://github.com/basil00/WinDivert) 2.x — os binários
+  (`WinDivert.dll`, `WinDivert64.sys`, `WinDivert.lib`) ficam em
+  `src-tauri/resources/x64/`
 
 ## Setup
 
