@@ -10,7 +10,7 @@ atravessada.
 
 ## ⬇ Download
 
-[**ragmarket-v0.1.1-setup.exe**](https://github.com/adsonpleal/ragmarket/releases/latest/download/ragmarket-v0.1.1-setup.exe)
+[**ragmarket-v0.2.0-setup.exe**](https://github.com/adsonpleal/ragmarket/releases/latest/download/ragmarket-v0.2.0-setup.exe)
 — instalador único para Windows 10/11 (~10 MB). Já inclui o WinDivert
 embutido; basta executar e seguir o instalador. O Ragmarket é configurado
 para sempre rodar como Administrador (vai aparecer um UAC ao iniciar — isso
@@ -199,8 +199,13 @@ cd C:\Users\adson\dev\ragmarket
 npm run tauri dev
 ```
 
-O Vite sobe em `http://localhost:1420`; em seguida o shell do Tauri carrega
-a UI.
+O Vite sobe em `http://localhost:1422`; em seguida o shell do Tauri carrega
+a UI. Você pode rodar várias instâncias em paralelo (uma por janela do
+jogo) — o `npm run tauri` é um wrapper que evita o conflito do
+`WinDivert64.sys` carregado pelo kernel; o `build.rs` cuida da cópia
+local com fallback quando o arquivo está travado. O `tauri build`
+(instalador) continua usando a config normal sem nenhum tratamento
+especial.
 
 ## Empacotando o .exe redistribuível
 

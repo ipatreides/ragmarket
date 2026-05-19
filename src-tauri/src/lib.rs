@@ -1,7 +1,10 @@
 mod capture;
+mod connections;
 mod packet;
+mod process;
 
 use capture::CaptureState;
+use connections::ConnectionsState;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
@@ -37,10 +40,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(CaptureState::default())
+        .manage(ConnectionsState::default())
         .invoke_handler(tauri::generate_handler![
             list_interfaces,
             start_capture,
             stop_capture,
+            connections::discover_clients_cmd,
+            connections::set_client_selection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

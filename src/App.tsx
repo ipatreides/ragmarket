@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCapture } from "./hooks/useCapture";
+import { useDiscoveredClients } from "./hooks/useDiscoveredClients";
+import { useLatestRelease } from "./hooks/useLatestRelease";
 import FilterSidebar, { EMPTY_FILTERS, Filters } from "./components/FilterSidebar";
 import ResultsTable from "./components/ResultsTable";
+import { UpdateBanner } from "./components/UpdateBanner";
+import { ClientPicker } from "./components/ClientPicker";
+import { setClientSelection } from "./lib/invoke";
 
 const STATUS_LABELS: Record<string, string> = {
   idle: "ocioso",
@@ -12,7 +17,9 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function App() {
   const cap = useCapture();
+  const update = useLatestRelease();
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [selectedPid, setSelectedPid] = useState<number | null>(null);
 
   // Reset filters whenever we go back to the idle screen.
   useEffect(() => {
@@ -20,6 +27,13 @@ export default function App() {
       setFilters(EMPTY_FILTERS);
     }
   }, [cap.status]);
+
+  const handleStart = useCallback(async () => {
+    // Lock in the PID filter before capture starts so the very first
+    // packets are gated correctly.
+    await setClientSelection(selectedPid);
+    await cap.start();
+  }, [cap, selectedPid]);
 
   const filtered = useMemo(() => {
     return cap.records.filter((r) => {
@@ -54,15 +68,20 @@ export default function App() {
       </header>
 
       <main className="app-main">
+        {update.available && (
+          <UpdateBanner release={update.available} onDismiss={update.dismiss} />
+        )}
         {cap.error && <div className="error-banner">⚠ {cap.error}</div>}
 
         {cap.status === "idle" ? (
           <IdleScreen
             interfaces={cap.interfaces}
             selectedIp={cap.selectedIp}
-            onSelect={cap.setSelectedIp}
-            onStart={cap.start}
-            onRefresh={cap.refreshInterfaces}
+            onSelectInterface={cap.setSelectedIp}
+            onStart={handleStart}
+            onRefreshInterfaces={cap.refreshInterfaces}
+            selectedPid={selectedPid}
+            onSelectPid={setSelectedPid}
           />
         ) : (
           <FilterScreen
@@ -124,33 +143,79 @@ function Footer() {
 function IdleScreen(props: {
   interfaces: ReturnType<typeof useCapture>["interfaces"];
   selectedIp: string | null;
-  onSelect: (ip: string) => void;
+  onSelectInterface: (ip: string) => void;
   onStart: () => void;
-  onRefresh: () => void;
+  onRefreshInterfaces: () => void;
+  selectedPid: number | null;
+  onSelectPid: (pid: number | null) => void;
 }) {
+  const { clients, refresh: refreshClients } = useDiscoveredClients();
+  const { selectedPid, onSelectPid } = props;
+
+  // If the chosen client disappears between refreshes, drop the
+  // selection so the user isn't silently filtering on a stale PID.
+  useEffect(() => {
+    if (selectedPid !== null && !clients.some((c) => c.pid === selectedPid)) {
+      onSelectPid(null);
+    }
+  }, [clients, selectedPid, onSelectPid]);
+
   return (
     <div className="screen idle">
       <h2>Pronto para gravar</h2>
-      <p className="muted">Selecione a interface de rede para capturar.</p>
-      <div className="nic-picker">
-        <select
-          value={props.selectedIp ?? ""}
-          onChange={(e) => props.onSelect(e.target.value)}
-        >
-          <option value="" disabled>
-            Selecione uma interface de rede…
-          </option>
-          {props.interfaces.map((i) => (
-            <option key={i.index} value={i.ipv4}>
-              {i.name} — {i.ipv4}
-              {i.is_loopback ? " (loopback)" : ""}
+
+      <div className="idle-section">
+        <label className="idle-label">Interface de rede</label>
+        <div className="nic-picker">
+          <select
+            value={props.selectedIp ?? ""}
+            onChange={(e) => props.onSelectInterface(e.target.value)}
+          >
+            <option value="" disabled>
+              Selecione uma interface de rede…
             </option>
-          ))}
-        </select>
-        <button onClick={props.onRefresh} title="Atualizar">
-          ⟳
-        </button>
+            {props.interfaces.map((i) => (
+              <option key={i.index} value={i.ipv4}>
+                {i.name} — {i.ipv4}
+                {i.is_loopback ? " (loopback)" : ""}
+              </option>
+            ))}
+          </select>
+          <button onClick={props.onRefreshInterfaces} title="Atualizar">
+            ⟳
+          </button>
+        </div>
       </div>
+
+      <div className="idle-section">
+        <div className="idle-label-row">
+          <label className="idle-label">Cliente (opcional)</label>
+          <button
+            type="button"
+            className="link-button"
+            onClick={refreshClients}
+            title="Atualizar lista de clientes"
+          >
+            ⟳ atualizar
+          </button>
+        </div>
+        <ClientPicker
+          clients={clients}
+          selectedPid={selectedPid}
+          onSelect={onSelectPid}
+          emptyMessage="Nenhum Ragexe conectado às portas do servidor. Deixe em branco para capturar tudo."
+        />
+        {selectedPid !== null && (
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => onSelectPid(null)}
+          >
+            Seguir todos (limpar seleção)
+          </button>
+        )}
+      </div>
+
       <button
         className="primary"
         onClick={props.onStart}

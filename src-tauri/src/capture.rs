@@ -9,13 +9,14 @@
 // on to the kernel TCP stack unchanged. The app never injects or modifies
 // any packet.
 
+use crate::connections::{ConnectionsState, FourTuple};
 use crate::NetworkInterface;
 use serde::Serialize;
 use std::ffi::{c_void, CString};
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 /// Handles are stored as `usize` so they can cross thread boundaries safely.
 /// `WinDivertShutdown` is documented as thread-safe and unblocks a concurrent
@@ -49,7 +50,7 @@ pub struct CaptureStats {
     pub matched: u64,
 }
 
-fn is_target_port(port: u16) -> bool {
+pub fn is_target_port(port: u16) -> bool {
     matches!(port, 6900 | 6951 | 4500) || (22000..=22100).contains(&port)
 }
 
@@ -215,6 +216,9 @@ pub fn start_capture(
         return Err("capture already running".into());
     }
 
+    // Each session starts with a clean client table and no PID filter.
+    app.state::<ConnectionsState>().reset();
+
     let handle_store = state.handle.clone();
     std::thread::spawn(move || {
         if let Err(e) = capture_loop(app.clone(), running.clone(), handle_store) {
@@ -294,6 +298,13 @@ fn capture_loop(
 
     let _ = app.emit("capture-started", ());
 
+    let conns = app.state::<ConnectionsState>();
+    // Capture-start snapshot of the filter. With the picker living on
+    // the idle screen, selection can't change mid-session — so we read
+    // selected_pid once and skip per-packet mutex acquisitions in the
+    // "follow all" case entirely.
+    let filtering = conns.selected_pid().is_some();
+
     let mut stats = CaptureStats {
         packets_seen: 0,
         matched: 0,
@@ -331,6 +342,13 @@ fn capture_loop(
         stats.packets_seen += 1;
 
         if let Some(ev) = parse_and_filter(datagram) {
+            if filtering {
+                let ft = four_tuple_from(&ev);
+                conns.observe(&ft);
+                if !conns.is_followed(&ft) {
+                    continue;
+                }
+            }
             stats.matched += 1;
             let _ = app.emit("packet-bytes", ev);
         }
@@ -401,4 +419,26 @@ fn parse_and_filter(datagram: &[u8]) -> Option<PacketEvent> {
         dst_port: tcp.dst_port,
         payload_hex: hex::encode(&tcp.payload),
     })
+}
+
+/// Classify endpoints as client vs server. The server side is whichever
+/// port matches `is_target_port`; the client takes an ephemeral port. If
+/// both sides fall in the target range we pick the source as server —
+/// the choice only affects which side keys the PID table, not filtering.
+fn four_tuple_from(ev: &PacketEvent) -> FourTuple {
+    if is_target_port(ev.src_port) {
+        FourTuple {
+            client_ip: ev.dst_ip.clone(),
+            client_port: ev.dst_port,
+            server_ip: ev.src_ip.clone(),
+            server_port: ev.src_port,
+        }
+    } else {
+        FourTuple {
+            client_ip: ev.src_ip.clone(),
+            client_port: ev.src_port,
+            server_ip: ev.dst_ip.clone(),
+            server_port: ev.dst_port,
+        }
+    }
 }

@@ -7,6 +7,43 @@ e o versionamento segue o [Versionamento Semântico](https://semver.org/lang/pt-
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-19
+
+### Adicionado
+- **Filtro por PID** na tela inicial: a aplicação varre a tabela TCP do
+  Windows e lista todos os `Ragexe.exe` conectados às portas do servidor
+  (6900, 6951, 4500, 22000–22100). Escolha um cliente e só os pacotes
+  daquele PID aparecem nos resultados. Deixe em branco para capturar tudo,
+  como antes.
+- **Banner de nova versão**: na inicialização, o app consulta a release
+  mais recente no GitHub e mostra um banner clicável quando há atualização.
+  Dispensa-se por versão (lembrado no `localStorage`); só reaparece quando
+  algo ainda mais novo é publicado.
+
+### Corrigido
+- O driver de kernel do WinDivert (`WinDivert64.sys`), carregado por
+  sessões anteriores, segurava o arquivo e fazia qualquer rebuild
+  subsequente falhar com `ERROR_SHARING_VIOLATION`. Agora o `build.rs`
+  coloca os binários do WinDivert no `target/<profile>/` ele mesmo, com
+  fallback de "manter o que já existe" quando o arquivo está travado, e
+  `npm run tauri` é wrappeado para anular `bundle.resources` apenas em
+  `dev` (instalador continua intacto).
+- Várias instâncias do Ragmarket podem rodar em paralelo agora — útil
+  com multi-cliente, e cada uma pode filtrar um PID diferente.
+
+### Alterado
+- Servidor de dev do Vite migrado da porta 1420 para a **1422** (e HMR
+  de 1421 → 1423), evitando colisão com o
+  [raglens](https://github.com/adsonpleal/raglens), que ocupa a 1420.
+
+### Performance
+- Loop de captura agora faz snapshot do filtro no início da sessão e
+  pula `observe`/`is_followed` (e seus mutexes) completamente quando
+  nenhum PID está selecionado — o caminho comum "seguir todos".
+- Cache por PID do `process_info` (nome do executável + horário de
+  início) evita 3 syscalls Win32 por cliente conhecido a cada poll de
+  descoberta (a cada 2 s na tela inicial).
+
 ## [0.1.1] - 2026-05-16
 
 ### Corrigido
@@ -75,6 +112,7 @@ e o versionamento segue o [Versionamento Semântico](https://semver.org/lang/pt-
 - `opener:allow-open-url` com escopo restrito a Divine Pride, RagCalc,
   RagnaRecap e GitHub (antes era irrestrito)
 
-[Unreleased]: https://github.com/adsonpleal/ragmarket/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/adsonpleal/ragmarket/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/adsonpleal/ragmarket/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/adsonpleal/ragmarket/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/adsonpleal/ragmarket/releases/tag/v0.1.0

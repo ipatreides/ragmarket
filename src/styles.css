@@ -375,3 +375,137 @@ table.results .opt-list {
   padding: 32px;
   text-align: center;
 }
+
+.client-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.client-list li {
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #1f1f1f;
+  border: 1px solid #2c2c2c;
+}
+
+.client-list li.selected {
+  background: #1f2d1f;
+  border-color: #3a6d3a;
+}
+
+.client-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.client-list input[type="radio"] {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.client-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.client-primary {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.client-secondary {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.idle-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 480px;
+  text-align: left;
+}
+
+.idle-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #aaa;
+}
+
+.idle-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.link-button {
+  color: #6aa6ff;
+  font-size: 11px;
+}
+
+.link-button:hover {
+  background: none;
+  color: #8fbcff;
+  text-decoration: underline;
+}
+
+.screen.idle .nic-picker {
+  min-width: 0;
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #1f3a5c;
+  color: #d4e6ff;
+  border-bottom: 1px solid #2a4d7a;
+  font-size: 13px;
+}
+
+.update-banner__link,
+.update-banner__close,
+.link-button {
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.update-banner__link {
+  font-size: inherit;
+  text-align: left;
+  text-decoration: underline;
+}
+
+.update-banner__link:hover,
+.update-banner__close:hover {
+  background: none;
+  color: #ffffff;
+}
+
+.update-banner__close {
+  padding: 0 6px;
+  font-size: 18px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
