@@ -1,6 +1,7 @@
 mod capture;
 mod connections;
 mod files;
+mod logger;
 mod market;
 mod packet;
 mod process;

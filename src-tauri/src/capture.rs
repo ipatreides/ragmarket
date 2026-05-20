@@ -10,6 +10,7 @@
 // any packet.
 
 use crate::connections::{ConnectionsState, FourTuple};
+use crate::logger::{Direction, OpcodeLogger};
 use crate::NetworkInterface;
 use serde::Serialize;
 use std::ffi::{c_void, CString};
@@ -305,6 +306,8 @@ fn capture_loop(
     // "follow all" case entirely.
     let filtering = conns.selected_pid().is_some();
 
+    let mut logger = OpcodeLogger::from_env();
+
     let mut stats = CaptureStats {
         packets_seen: 0,
         matched: 0,
@@ -341,7 +344,7 @@ fn capture_loop(
         let datagram = &packet[..recv_len as usize];
         stats.packets_seen += 1;
 
-        if let Some(ev) = parse_and_filter(datagram) {
+        if let Some(ev) = parse_and_filter(datagram, logger.as_mut()) {
             if filtering {
                 let ft = four_tuple_from(&ev);
                 conns.observe(&ft);
@@ -390,7 +393,10 @@ fn capture_loop(
 }
 
 #[cfg(windows)]
-fn parse_and_filter(datagram: &[u8]) -> Option<PacketEvent> {
+fn parse_and_filter(
+    datagram: &[u8],
+    logger: Option<&mut OpcodeLogger>,
+) -> Option<PacketEvent> {
     let ip = crate::packet::parse_ipv4(datagram)?;
     if ip.proto != 6 {
         return None;
@@ -406,18 +412,41 @@ fn parse_and_filter(datagram: &[u8]) -> Option<PacketEvent> {
     if tcp.payload.is_empty() {
         return None;
     }
+    let src_ip = format!("{}.{}.{}.{}", ip.src[0], ip.src[1], ip.src[2], ip.src[3]);
+    let dst_ip = format!("{}.{}.{}.{}", ip.dst[0], ip.dst[1], ip.dst[2], ip.dst[3]);
+    let payload_hex = hex::encode(&tcp.payload);
+    if let Some(logger) = logger {
+        if tcp.payload.len() >= 2 {
+            let opcode = u16::from_le_bytes([tcp.payload[0], tcp.payload[1]]);
+            // Server side is whichever endpoint holds a target port —
+            // game servers listen on 6900/6951/4500/22000-22100, the
+            // client side gets an ephemeral port. If both sides match
+            // (shouldn't happen with our filter, but cheap to handle),
+            // fall back to "C->S" so we don't misclassify a single
+            // direction as bidirectional.
+            let direction = if is_target_port(tcp.src_port) {
+                Direction::ToClient
+            } else {
+                Direction::ToServer
+            };
+            let _ = logger.log(
+                direction,
+                &src_ip,
+                tcp.src_port,
+                &dst_ip,
+                tcp.dst_port,
+                opcode,
+                tcp.payload.len(),
+                &payload_hex,
+            );
+        }
+    }
     Some(PacketEvent {
-        src_ip: format!(
-            "{}.{}.{}.{}",
-            ip.src[0], ip.src[1], ip.src[2], ip.src[3]
-        ),
+        src_ip,
         src_port: tcp.src_port,
-        dst_ip: format!(
-            "{}.{}.{}.{}",
-            ip.dst[0], ip.dst[1], ip.dst[2], ip.dst[3]
-        ),
+        dst_ip,
         dst_port: tcp.dst_port,
-        payload_hex: hex::encode(&tcp.payload),
+        payload_hex,
     })
 }
 
