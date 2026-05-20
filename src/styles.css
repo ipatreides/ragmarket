@@ -146,7 +146,8 @@ button.primary:hover { background: #2f5cd0; }
 .filter-screen {
   display: grid;
   grid-template-columns: 280px 1fr;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -509,3 +510,209 @@ table.results .opt-list {
   line-height: 1;
   flex: 0 0 auto;
 }
+
+/* ---- Header right (server picker + status pill) ---- */
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.server-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.server-picker select {
+  padding: 4px 8px;
+  background: #222;
+  color: inherit;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* ---- Tab bar (tabs + global session actions) ---- */
+
+.tab-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-right: 16px;
+  border-bottom: 1px solid #2c2c2c;
+  background: #141414;
+  flex: 0 0 auto;
+}
+
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+}
+
+/* ---- Main tabs ---- */
+
+.main-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px 0;
+  background: transparent;
+}
+
+.main-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 8px 16px;
+  color: #aaa;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  top: 1px;
+}
+
+.main-tab:hover {
+  background: #1f1f1f;
+  color: #fff;
+}
+
+.main-tab.active {
+  background: #1a1a1a;
+  color: #fff;
+  border-color: #2c2c2c;
+  border-bottom-color: #1a1a1a;
+}
+
+.main-tab-count {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  font-size: 11px;
+  text-align: center;
+  color: #ccc;
+}
+
+.main-tab.active .main-tab-count {
+  background: #3a4a6c;
+  border-color: #4a5a7c;
+  color: #d4e6ff;
+}
+
+/* ---- Star button ---- */
+
+.star-button {
+  background: none;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.1s ease, background-color 0.1s ease;
+}
+
+.star-button:hover {
+  background: #2a2a2a;
+  color: #ddd;
+}
+
+.star-button.on {
+  color: #f5c84b;
+}
+
+.star-button.on:hover {
+  color: #ffd86a;
+}
+
+/* ---- Item-cell + link pair (Meus Itens / Favoritos) ---- */
+
+.item-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.item-links .ext-link {
+  color: #6aa6ff;
+  cursor: pointer;
+}
+
+.item-links .ext-link:hover {
+  color: #8fbcff;
+  text-decoration: underline;
+}
+
+/* ---- Empty state helpers ---- */
+
+.empty-list {
+  text-align: left;
+  margin: 8px 0;
+  padding-left: 18px;
+  color: #ccc;
+}
+
+.empty-list li {
+  margin: 4px 0;
+}
+
+.empty-list kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid #3a3a3a;
+  border-radius: 3px;
+  background: #222;
+  font-family: inherit;
+  font-size: 11px;
+  color: #ddd;
+}
+
+/* ---- Favoritos view ---- */
+
+.favorites-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 24px;
+}
+
+.favorites-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.favorite-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #232323;
+}
+
+.favorite-name {
+  flex: 1;
+  min-width: 0;
+}
+
+

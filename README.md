@@ -1,8 +1,14 @@
 # ragmarket
 
 Aplicativo standalone para Windows que captura os pacotes do seu próprio
-cliente enquanto você usa o **Catálogo de Vendas** do latamRO, decodifica os
-resultados das buscas e mostra tudo em uma tabela ordenável e filtrável.
+cliente enquanto você joga latamRO e decodifica:
+
+- **Catálogo**: resultados das buscas do Catálogo de Vendas em uma tabela
+  ordenável e filtrável.
+- **Meus Itens**: o que está no seu inventário, carrinho, armazém Kafra e
+  armazém do clã — populado automaticamente conforme o servidor envia.
+- **Favoritos**: itens marcados com ⭐, persistidos entre sessões e com
+  links rápidos para o Divine Pride e para a busca do Mercado.
 
 Somente leitura: cada byte exibido vem do servidor para o seu próprio cliente.
 Nenhum pacote é construído ou enviado. Nenhuma proteção anti-cheat é
@@ -10,7 +16,7 @@ atravessada.
 
 ## ⬇ Download
 
-[**ragmarket-v0.2.0-setup.exe**](https://github.com/adsonpleal/ragmarket/releases/latest/download/ragmarket-v0.2.0-setup.exe)
+[**ragmarket-v0.3.0-setup.exe**](https://github.com/adsonpleal/ragmarket/releases/latest/download/ragmarket-v0.3.0-setup.exe)
 — instalador único para Windows 10/11 (~10 MB). Já inclui o WinDivert
 embutido; basta executar e seguir o instalador. O Ragmarket é configurado
 para sempre rodar como Administrador (vai aparecer um UAC ao iniciar — isso
@@ -95,11 +101,16 @@ O Windows está instalando o driver de kernel do WinDivert como serviço (uma
 
 Não. Tudo é processado localmente. O Ragmarket:
 
-- Não captura pacotes de login (filtra só portas do servidor de mapa que
-  carregam buscas do catálogo).
-- Não envia nenhum dado para servidores externos, exceto consultas anônimas
-  ao Divine Pride **quando você clica em um nome de item** para abrir a
-  página dele no navegador.
+- Não captura pacotes de login (filtra só portas do servidor de mapa).
+  As listas decodificadas são as buscas do catálogo e os dumps de
+  contêiner (inventário, carrinho, armazém) que o servidor manda pro
+  seu próprio cliente.
+- Favoritos e a preferência de servidor ficam só no `localStorage` da
+  janela do app, no seu computador.
+- Não envia nenhum dado para servidores externos, exceto quando você
+  **clica em um link de item**: o Divine Pride é consultado com o ID
+  do item e a busca do Mercado é aberta com o nome do item — ambos no
+  seu navegador padrão, sem credenciais.
 
 ### 8. Funciona em outros servidores de RO?
 
@@ -124,6 +135,12 @@ ou "Item XXXX". Não impacta a busca/filtragem, só o nome legível.
 O Divine Pride tem a descrição completa, screenshots, drops, conjuntos, etc.
 Não vale a pena replicar isso localmente. O clique manda o ID do item para
 `divine-pride.net/database/item/<id>?server=latamRO`.
+
+Nas abas **Meus Itens** e **Favoritos**, cada linha também tem um link
+**Mercado** que abre a busca do Catálogo de Vendas no gnjoylatam já
+filtrada por nome do item, ordenada do menor preço pro maior. O servidor
+usado nesse link (Freya ou Nidhogg) sai do picker no canto superior
+direito.
 
 ### 12. Posso fazer várias buscas diferentes em uma sessão?
 
@@ -226,45 +243,82 @@ administrador** ao abrir o `ragmarket.exe` final.
 
 1. Abra como Administrador.
 2. Escolha a interface de rede ativa no dropdown.
-3. Clique em **Iniciar Gravação**.
-4. No jogo, abra o Catálogo de Vendas, faça suas buscas e navegue por todas
-   as páginas dos resultados.
-5. Os resultados aparecem na tabela em tempo real conforme os pacotes chegam.
-6. Use a barra lateral para filtrar:
-   - Faixa de refino (mín-máx)
-   - Itens (chips multi-seleção — útil quando você buscou itens diferentes)
-   - Cartas / encantos (multi-seleção; AND — a linha precisa ter todas as
-     cartas selecionadas)
-   - Opções aleatórias (checkbox por opção + faixa de valor; AND)
-7. Clique nos cabeçalhos das colunas para ordenar; clique no nome do item ou
-   da carta para abrir a página do Divine Pride no navegador.
+3. (Opcional) selecione o cliente `Ragexe.exe` para focar — deixe em
+   branco pra capturar todos.
+4. Clique em **Iniciar Gravação**.
+
+Três abas ficam disponíveis durante a sessão:
+
+- **Catálogo** — abra o Catálogo de Vendas dentro do jogo e os resultados
+  aparecem aqui em tempo real. Barra lateral filtra por refino, item,
+  cartas/encantos e opções aleatórias.
+- **Meus Itens** — inventário e carrinho aparecem sozinhos ao selecionar
+  o personagem; armazém Kafra e armazém do clã aparecem na primeira vez
+  que você abre cada NPC. Filtro de fonte (chips Inventário /
+  Carrinho / Kafra / Clã).
+- **Favoritos** — itens marcados com ⭐ em qualquer das duas tabelas
+  anteriores. Persiste entre sessões.
+
+Em todas as tabelas, clique no nome de um item ou carta pra abrir o
+Divine Pride. Em **Meus Itens** e **Favoritos** há também um link
+**Mercado** ao lado de cada item que abre a busca do gnjoylatam pelo
+nome (servidor selecionável no cabeçalho — Freya por padrão).
+
+Controles globais (**Parar Gravação**, **Limpar**, **Nova Sessão**)
+ficam no topo da tela e funcionam independente da aba aberta.
 
 ## Estrutura do projeto
 
 ```
 ragmarket/
 ├── src/                       Frontend React/TS
-│   ├── App.tsx
+│   ├── App.tsx                Container + abas + ações globais
 │   ├── components/
-│   │   ├── FilterSidebar.tsx
-│   │   └── ResultsTable.tsx
+│   │   ├── FilterSidebar.tsx       Filtros do Catálogo
+│   │   ├── ResultsTable.tsx        Tabela do Catálogo
+│   │   ├── MyItemsView.tsx         Aba Meus Itens
+│   │   ├── FavoritesView.tsx       Aba Favoritos
+│   │   ├── MainTabs.tsx            Barra de abas
+│   │   ├── SessionActions.tsx      (inline em App.tsx) Stop/Limpar/Nova Sessão
+│   │   ├── SortableTable.tsx       Tabela genérica (TanStack) compartilhada
+│   │   ├── itemColumns.tsx         Factories: starColumn, cardsColumn, optionsColumn
+│   │   ├── ItemLinks.tsx           Par de links DP + Mercado por item
+│   │   ├── StarButton.tsx          Toggle de favorito
+│   │   ├── ServerPicker.tsx        Picker Freya/Nidhogg
+│   │   ├── ClientPicker.tsx        Picker de PID do Ragexe na tela inicial
+│   │   └── UpdateBanner.tsx        Banner de nova versão
 │   ├── hooks/
-│   │   ├── useCapture.ts      Inscrição em eventos do Tauri + parse por stream
-│   │   └── useItemNames.ts    Resolução de nomes a partir do dp-item.json
+│   │   ├── useCapture.ts           Subs Tauri + walker por stream + flush em lote
+│   │   ├── useItemNames.ts         Resolução de nomes a partir do dp-item.json
+│   │   ├── useFavorites.ts         Set<itemID> persistido
+│   │   ├── useServerPref.ts        Server escolhido persistido
+│   │   ├── usePersistentValue.ts   Genérico localStorage + sync entre janelas
+│   │   ├── useDiscoveredClients.ts Polling do TCP table pelo Ragexe
+│   │   └── useLatestRelease.ts     Checagem de update via API do GitHub
 │   ├── services/
-│   │   ├── parser.ts          Decodificador do registro 0x0836
-│   │   ├── parser.test.ts     Testes Vitest
-│   │   ├── randomOptions.ts   Lookup ID → nome de opção aleatória
-│   │   └── divinePride.ts     Cliente do JSON estático com cache em sessão
+│   │   ├── parser.ts                  Decoder do 0x0836 (search_store_info)
+│   │   ├── parser.test.ts
+│   │   ├── inventoryParser.ts         Decoder dos pacotes V6 de contêiner
+│   │   ├── inventoryParser.test.ts
+│   │   ├── randomOptions.ts           Lookup de opção aleatória
+│   │   └── divinePride.ts             Cliente do JSON estático
+│   ├── lib/
+│   │   ├── bytes.ts                   u16le / u32le / hexToBytes / concat
+│   │   ├── links.ts                   dpUrl + marketUrl + openExternal
+│   │   ├── invoke.ts                  Wrappers das Tauri commands
+│   │   ├── types.ts
+│   │   └── updates.ts
 │   └── shared/
-│       └── random_options.json  Mirror do random_option_db do rAthena
+│       └── random_options.json   Mirror do random_option_db do rAthena
 ├── public/db/
-│   └── dp-item.json           Mirror estático de itens do Divine Pride (~1,4 MB)
+│   └── dp-item.json              Mirror estático de itens do Divine Pride (~1,4 MB)
 ├── src-tauri/                 Backend Rust
 │   ├── src/
 │   │   ├── main.rs            Entry point do Tauri
 │   │   ├── lib.rs             Registro de comandos
 │   │   ├── capture.rs         Loop de captura WinDivert + enumeração de NICs
+│   │   ├── connections.rs     PID picker (varre tabela TCP do Windows)
+│   │   ├── process.rs         Utilitários Win32 (process info, TCP table)
 │   │   └── packet.rs          Parsing de cabeçalhos IPv4 + TCP
 │   ├── resources/x64/         WinDivert.dll, WinDivert64.sys, WinDivert.lib
 │   ├── capabilities/default.json
@@ -280,8 +334,10 @@ ragmarket/
 npm test
 ```
 
-Oito testes unitários cobrem o decodificador do `0x0836` contra fixtures
-sintéticas que reproduzem o layout de bytes que veio das capturas reais.
+Treze testes unitários cobrem os decodificadores do `0x0836` (catálogo) e
+dos pacotes V6 de contêiner (`0x0B08`/`0x0B09`/`0x0B0A`/`0x0B0B`/`0x0B39`)
+contra fixtures sintéticas que reproduzem o layout de bytes que veio das
+capturas reais.
 
 ## Notas do protocolo
 
@@ -312,3 +368,21 @@ Outros opcodes observados no tráfego latamRO (não decodificados atualmente):
 - `0x0838` cliente → servidor — pedido de próxima página
 - `0x083C` / `0x083D` — round-trip de clique em loja (carregaria coordenadas;
   fora do escopo do v1)
+
+### Pacotes de contêiner (V6 unificado)
+
+Inventário, carrinho, armazém Kafra e armazém do clã usam o mesmo
+quinteto de opcodes, distinguidos pelo byte `invType` (0=inventário,
+1=carrinho, 2=Kafra, 3=clã):
+
+| Opcode | Nome | Header | Registro |
+|---|---|---|---|
+| `0x0B08` | `ZC_INVENTORY_START` | `u16 op, u16 len, u8 invType, name(Z*)` | — |
+| `0x0B09` | `ZC_INVENTORY_ITEMLIST_NORMAL_V6` | `u16 op, u16 len, u8 invType` | 34 bytes |
+| `0x0B0A` | `ZC_INVENTORY_ITEMLIST_EQUIP_V6` (sem grade) | idem | **67 bytes** |
+| `0x0B39` | `ZC_INVENTORY_ITEMLIST_EQUIP_V6` (com grade) | idem | 68 bytes |
+| `0x0B0B` | `ZC_INVENTORY_END` | `u16 op, u8 invType, u8 result` (fixo 4 bytes) | — |
+
+Nota: a variante do latamRO **não tem o byte de Flag final** no
+registro de equip (rAthena master define 68; aqui são 67). Detalhe
+verificado contra captura real e refletido no decoder.

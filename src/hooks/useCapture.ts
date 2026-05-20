@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import { extract0836Packets, ShopRecord } from "../services/parser";
+import { concat, hexToBytes } from "../lib/bytes";
+import { ShopRecord } from "../services/parser";
+import {
+  ALL_INV_TYPES,
+  extractAllPackets,
+  InventoryItem,
+  InvType,
+  newWalkerState,
+  WalkerState,
+} from "../services/inventoryParser";
 
 export type NetworkInterface = {
   index: number;
@@ -25,19 +34,12 @@ export type CaptureStats = {
   matched: number;
 };
 
-function hexToBytes(hex: string): Uint8Array {
-  const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    out[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-  }
-  return out;
-}
+export type InventorySnapshots = Record<InvType, InventoryItem[]>;
 
-function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
-  const out = new Uint8Array(a.length + b.length);
-  out.set(a, 0);
-  out.set(b, a.length);
-  return out;
+function emptySnapshots(): InventorySnapshots {
+  const r = {} as InventorySnapshots;
+  for (const t of ALL_INV_TYPES) r[t] = [];
+  return r;
 }
 
 function streamKey(p: PacketEvent): string {
@@ -46,6 +48,11 @@ function streamKey(p: PacketEvent): string {
 
 const FLUSH_INTERVAL_MS = 100;
 
+// Server frames every container with a START / items+ / END sequence; we
+// accumulate records into `builders[invType]` between START and END, then on
+// END atomically replace that invType's snapshot in React state.
+type StreamBuilders = Map<InvType, InventoryItem[]>;
+
 export function useCapture() {
   const [interfaces, setInterfaces] = useState<NetworkInterface[]>([]);
   const [selectedIp, setSelectedIp] = useState<string | null>(null);
@@ -53,28 +60,42 @@ export function useCapture() {
   const [stats, setStats] = useState<CaptureStats>({ packets_seen: 0, matched: 0 });
   const [records, setRecords] = useState<ShopRecord[]>([]);
   const [pageCount, setPageCount] = useState(0);
+  const [inventory, setInventory] = useState<InventorySnapshots>(() =>
+    emptySnapshots(),
+  );
   const [error, setError] = useState<string | null>(null);
 
-  // Per-stream byte buffers (reassembled in order of arrival).
   const streams = useRef<Map<string, Uint8Array>>(new Map());
-  // Pending batched updates — flushed every FLUSH_INTERVAL_MS to keep React
+  const walkers = useRef<Map<string, WalkerState>>(new Map());
+  const builders = useRef<Map<string, StreamBuilders>>(new Map());
+  // Batched updates — flushed every FLUSH_INTERVAL_MS to keep React
   // re-renders bounded under heavy packet load.
   const pendingRecords = useRef<ShopRecord[]>([]);
   const pendingPages = useRef(0);
+  const pendingInventory = useRef<Map<InvType, InventoryItem[]>>(new Map());
   const flushTimer = useRef<number | null>(null);
 
   const flushPending = useCallback(() => {
     flushTimer.current = null;
     const batch = pendingRecords.current;
     const pages = pendingPages.current;
-    if (batch.length === 0 && pages === 0) return;
+    const invBatch = pendingInventory.current;
+    if (batch.length === 0 && pages === 0 && invBatch.size === 0) return;
     pendingRecords.current = [];
     pendingPages.current = 0;
+    pendingInventory.current = new Map();
     if (batch.length > 0) {
       setRecords((rs) => rs.concat(batch));
     }
     if (pages > 0) {
       setPageCount((c) => c + pages);
+    }
+    if (invBatch.size > 0) {
+      setInventory((prev) => {
+        const next = { ...prev };
+        for (const [t, items] of invBatch) next[t] = items;
+        return next;
+      });
     }
   }, []);
 
@@ -98,7 +119,6 @@ export function useCapture() {
     refreshInterfaces();
   }, [refreshInterfaces]);
 
-  // Listen for backend events whenever we're recording.
   useEffect(() => {
     if (status !== "recording") return;
     const aborted = { current: false };
@@ -123,17 +143,50 @@ export function useCapture() {
       if (
         !(await subscribe<PacketEvent>("packet-bytes", (e) => {
           const key = streamKey(e.payload);
+          const payload = hexToBytes(e.payload.payload_hex);
           const prev = streams.current.get(key) ?? new Uint8Array();
-          const merged = concat(prev, hexToBytes(e.payload.payload_hex));
-          const { pages, tail } = extract0836Packets(merged);
-          streams.current.set(key, tail);
-          if (pages.length > 0) {
-            for (const p of pages) {
-              for (const r of p.records) pendingRecords.current.push(r);
-            }
-            pendingPages.current += pages.length;
-            scheduleFlush();
+          const merged = concat(prev, payload);
+          let walker = walkers.current.get(key);
+          if (!walker) {
+            walker = newWalkerState();
+            walkers.current.set(key, walker);
           }
+          const { events, tail } = extractAllPackets(merged, walker);
+          streams.current.set(key, tail);
+          if (events.length === 0) {
+            scheduleFlush();
+            return;
+          }
+
+          let streamBuilders = builders.current.get(key);
+          for (const ev of events) {
+            if (ev.kind === "search") {
+              for (const r of ev.page.records) pendingRecords.current.push(r);
+              pendingPages.current += 1;
+              continue;
+            }
+            if (!streamBuilders) {
+              streamBuilders = new Map();
+              builders.current.set(key, streamBuilders);
+            }
+            if (ev.kind === "start") {
+              streamBuilders.set(ev.invType, []);
+            } else if (ev.kind === "items") {
+              // If items arrive without a preceding START (e.g. we joined
+              // the stream mid-dump), still accumulate so the user sees
+              // what we can.
+              const cur = streamBuilders.get(ev.invType) ?? [];
+              for (const item of ev.items) cur.push(item);
+              streamBuilders.set(ev.invType, cur);
+            } else if (ev.kind === "end") {
+              const built = streamBuilders.get(ev.invType);
+              if (built !== undefined) {
+                pendingInventory.current.set(ev.invType, built);
+                streamBuilders.delete(ev.invType);
+              }
+            }
+          }
+          scheduleFlush();
         }))
       )
         return;
@@ -167,6 +220,15 @@ export function useCapture() {
     };
   }, [status, scheduleFlush, flushPending]);
 
+  const resetBuffers = useCallback(() => {
+    streams.current.clear();
+    walkers.current.clear();
+    builders.current.clear();
+    pendingRecords.current = [];
+    pendingPages.current = 0;
+    pendingInventory.current = new Map();
+  }, []);
+
   const start = useCallback(async () => {
     if (!selectedIp) {
       setError("No interface selected");
@@ -174,10 +236,9 @@ export function useCapture() {
     }
     setRecords([]);
     setPageCount(0);
+    setInventory(emptySnapshots());
     setStats({ packets_seen: 0, matched: 0 });
-    streams.current.clear();
-    pendingRecords.current = [];
-    pendingPages.current = 0;
+    resetBuffers();
     setError(null);
     try {
       await invoke("start_capture", { ipv4: selectedIp });
@@ -185,7 +246,7 @@ export function useCapture() {
     } catch (e) {
       setError(String(e));
     }
-  }, [selectedIp]);
+  }, [selectedIp, resetBuffers]);
 
   const stop = useCallback(async () => {
     try {
@@ -200,20 +261,18 @@ export function useCapture() {
     setStatus("idle");
     setRecords([]);
     setPageCount(0);
-    streams.current.clear();
-    pendingRecords.current = [];
-    pendingPages.current = 0;
+    setInventory(emptySnapshots());
+    resetBuffers();
     setError(null);
-  }, []);
+  }, [resetBuffers]);
 
   /** Wipe captured records without changing recording state. */
   const clearRecords = useCallback(() => {
     setRecords([]);
     setPageCount(0);
-    streams.current.clear();
-    pendingRecords.current = [];
-    pendingPages.current = 0;
-  }, []);
+    setInventory(emptySnapshots());
+    resetBuffers();
+  }, [resetBuffers]);
 
   return {
     interfaces,
@@ -223,6 +282,7 @@ export function useCapture() {
     stats,
     records,
     pageCount,
+    inventory,
     error,
     start,
     stop,

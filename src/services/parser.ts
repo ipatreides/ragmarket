@@ -19,6 +19,7 @@
 //   bytes 101-116   : 4 cards (u32 LE each)
 //   bytes 117-140   : up to 4 random options (5 bytes each: u16 idx, u16 val, i8 param)
 
+import { i8, u16le, u32le } from "../lib/bytes";
 import { decodeOption, DecodedOption } from "./randomOptions";
 
 export type ShopRecord = {
@@ -51,24 +52,6 @@ function latin1(bytes: Uint8Array): string {
   let s = "";
   for (let i = 0; i < end; i++) s += String.fromCharCode(bytes[i]);
   return s;
-}
-
-function u32le(buf: Uint8Array, off: number): number {
-  return (
-    buf[off] |
-    (buf[off + 1] << 8) |
-    (buf[off + 2] << 16) |
-    (buf[off + 3] << 24)
-  ) >>> 0;
-}
-
-function u16le(buf: Uint8Array, off: number): number {
-  return buf[off] | (buf[off + 1] << 8);
-}
-
-function i8(buf: Uint8Array, off: number): number {
-  const v = buf[off];
-  return v > 127 ? v - 256 : v;
 }
 
 export function decodeRecord(rec: Uint8Array): ShopRecord {

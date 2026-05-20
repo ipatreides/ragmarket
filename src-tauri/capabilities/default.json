@@ -17,6 +17,7 @@
       "allow": [
         { "url": "https://www.divine-pride.net/**" },
         { "url": "https://divine-pride.net/**" },
+        { "url": "https://ro.gnjoylatam.com/**" },
         { "url": "https://ragcalc.web.app/**" },
         { "url": "https://ragnarecap.web.app/**" },
         { "url": "https://github.com/**" }

@@ -1,32 +1,23 @@
-import { useMemo, useState } from "react";
-import {
-  createColumnHelper,
-  flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  SortingState,
-  useReactTable,
-} from "@tanstack/react-table";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { useMemo } from "react";
+import { createColumnHelper } from "@tanstack/react-table";
 import { ShopRecord } from "../services/parser";
 import { useCardNames, useItemNames } from "../hooks/useItemNames";
+import { useFavorites } from "../hooks/useFavorites";
+import { dpUrl, openExternal } from "../lib/links";
+import { SortableTable } from "./SortableTable";
+import { cardsColumn, optionsColumn, starColumn } from "./itemColumns";
 
 const ch = createColumnHelper<ShopRecord>();
 
-function dpUrl(id: number): string {
-  return `https://www.divine-pride.net/database/item/${id}?server=latamRO`;
-}
-
 function DpLink({ id, children }: { id: number; children: React.ReactNode }) {
+  const href = dpUrl(id);
   return (
     <a
-      href={dpUrl(id)}
+      href={href}
       className="dp-link"
       onClick={(e) => {
         e.preventDefault();
-        openUrl(dpUrl(id)).catch((err) =>
-          console.error("[DpLink] openUrl failed:", err),
-        );
+        openExternal(href);
       }}
     >
       {children}
@@ -43,9 +34,11 @@ export default function ResultsTable({ records }: { records: ShopRecord[] }) {
 
   const itemNames = useItemNames(itemIds);
   const cardNames = useCardNames(cardIds);
+  const { isFavorite, toggle } = useFavorites();
 
   const columns = useMemo(
     () => [
+      starColumn<ShopRecord>({ isFavorite, toggle }),
       ch.accessor("itemID", {
         header: "Item",
         cell: (info) => {
@@ -69,44 +62,14 @@ export default function ResultsTable({ records }: { records: ShopRecord[] }) {
         cell: (info) => info.getValue().toLocaleString("pt-BR"),
         sortingFn: "basic",
       }),
-      ch.accessor((r) => r.cards.filter((c) => c > 0), {
-        id: "cards",
-        header: "Cartas / Encantos",
-        cell: (info) => {
-          const cs = info.getValue();
-          if (cs.length === 0) return <span className="muted">—</span>;
-          return (
-            <span>
-              {cs.map((c, i) => {
-                const name = cardNames.get(`card:${c}`) ?? `Carta ${c}`;
-                return (
-                  <span key={c}>
-                    {i > 0 && ", "}
-                    <DpLink id={c}>{name}</DpLink>
-                  </span>
-                );
-              })}
-            </span>
-          );
-        },
-        enableSorting: false,
-      }),
-      ch.accessor((r) => r.options, {
-        id: "options",
-        header: "Opções Aleatórias",
-        cell: (info) => {
-          const opts = info.getValue();
-          if (opts.length === 0) return <span className="muted">—</span>;
-          return (
-            <ul className="opt-list">
-              {opts.map((o, i) => (
-                <li key={i}>{o.text}</li>
-              ))}
-            </ul>
-          );
-        },
-        enableSorting: false,
-      }),
+      cardsColumn<ShopRecord>(
+        "cards",
+        "Cartas / Encantos",
+        (r) => r.cards,
+        cardNames,
+        (id, name) => <DpLink id={id}>{name}</DpLink>,
+      ),
+      optionsColumn<ShopRecord>("options", (r) => r.options, "Opções Aleatórias"),
       ch.accessor("shopName", {
         header: "Loja",
         cell: (info) => {
@@ -116,64 +79,14 @@ export default function ResultsTable({ records }: { records: ShopRecord[] }) {
         },
       }),
     ],
-    [itemNames, cardNames],
+    [itemNames, cardNames, isFavorite, toggle],
   );
 
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "price", desc: false },
-  ]);
-
-  const table = useReactTable({
-    data: records,
-    columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  });
-
   return (
-    <table className="results">
-      <thead>
-        {table.getHeaderGroups().map((hg) => (
-          <tr key={hg.id}>
-            {hg.headers.map((h) => {
-              const sorted = h.column.getIsSorted();
-              const ariaSort: "ascending" | "descending" | "none" =
-                sorted === "asc"
-                  ? "ascending"
-                  : sorted === "desc"
-                    ? "descending"
-                    : "none";
-              return (
-                <th
-                  key={h.id}
-                  scope="col"
-                  aria-sort={ariaSort}
-                  onClick={h.column.getToggleSortingHandler()}
-                  style={{
-                    cursor: h.column.getCanSort() ? "pointer" : "default",
-                  }}
-                >
-                  {flexRender(h.column.columnDef.header, h.getContext())}
-                  {{ asc: " ▲", desc: " ▼" }[sorted as string] ?? null}
-                </th>
-              );
-            })}
-          </tr>
-        ))}
-      </thead>
-      <tbody>
-        {table.getRowModel().rows.map((row) => (
-          <tr key={row.id}>
-            {row.getVisibleCells().map((cell) => (
-              <td key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <SortableTable
+      columns={columns}
+      data={records}
+      initialSort={[{ id: "price", desc: false }]}
+    />
   );
 }

@@ -7,7 +7,75 @@ e o versionamento segue o [Versionamento Semântico](https://semver.org/lang/pt-
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-05-19
+## [0.3.0] - 2026-05-19
+
+### Adicionado
+- **Aba "Meus Itens"**: lista o que o jogador possui no inventário,
+  carrinho, armazém Kafra e armazém do clã. Os dados vêm dos pacotes
+  V6 unificados que o servidor já envia (`0x0B08` START, `0x0B09`
+  NORMAL, `0x0B0A` EQUIP, `0x0B0B` END) — o invType de cada pacote
+  identifica o contêiner. Inventário e carrinho aparecem
+  automaticamente ao selecionar o personagem; Kafra e clã exigem
+  abrir o NPC uma vez. Filtro por fonte (chips Inventário /
+  Carrinho / Armazém Kafra / Clã).
+- **Aba "Favoritos"**: marque qualquer item com ⭐ no catálogo ou em
+  Meus Itens e ele aparece aqui. Persiste em `localStorage` (chave
+  `ragmarket.favorites`) e sincroniza em tempo real entre todas as
+  abas que mostram itens.
+- **Picker de servidor** no cabeçalho (Freya / Nidhogg, default
+  Freya). O valor escolhido é usado nos novos links de **Mercado**
+  ao lado de cada item, que abrem a busca do
+  [Catálogo de Vendas do gnjoylatam](https://ro.gnjoylatam.com/pt/intro/shop-search/trading)
+  já com `storeType=BUY`, `sortType=LOW_PRICE` e o nome do item
+  pré-preenchido.
+- Decoder do registro `EQUIPITEM_INFO` (67 bytes na variante sem
+  grade, 68 com grade) e do `NORMALITEM_INFO` (34 bytes),
+  reverse-engineered contra capturas reais do latamRO.
+- Botão ⭐ Favoritar como primeira coluna da tabela do catálogo,
+  ao lado do nome de cada item.
+
+### Alterado
+- Controles globais da sessão (**Parar Gravação** / **Limpar** /
+  **Nova Sessão**) migraram da aba Catálogo para uma barra de ações
+  global compartilhada por todas as abas — aparece junto das abas no
+  topo e funciona independente de qual aba está aberta.
+- O empty-state de "Nova Sessão" no Catálogo mantém o mesmo conteúdo,
+  mas agora vive dentro de um contêiner com rolagem (consistente com
+  Meus Itens e Favoritos).
+- Tabela do catálogo refatorada para usar um componente compartilhado
+  `<SortableTable>` + factories de coluna (`starColumn`, `cardsColumn`,
+  `optionsColumn`) também usados por Meus Itens. Nenhuma mudança de
+  comportamento.
+
+### Performance
+- Atualizações de inventário passam pelo mesmo flush em lote a cada
+  100 ms que já protegia o catálogo, evitando re-render por pacote
+  em rajadas de despejo de contêiner.
+
+### Robustez
+- O walker de pacotes ganhou estado por stream (`WalkerState`):
+  eventos de items/end só são aceitos depois de um START
+  correspondente. Sem isso, sequências aleatórias `0a 0b xx yy ii`
+  em outros pacotes eram interpretadas como itens fantasmas.
+- Validação de `invType ∈ {0,1,2,3}` em todos os decodificadores;
+  combinada com o gate acima, elimina toda categoria de spurious
+  match em dados aleatórios.
+- Peek do `invType` **antes** do check `length > buffer.length`
+  no walker — sem isso, um match espúrio cujo "length" excede o
+  buffer travava o walker indefinidamente esperando bytes que nunca
+  chegariam em forma reconhecível.
+- Limite de tamanho realista por pacote (16 KB) e por START
+  (64 bytes), descartando matches espúrios com length implausível
+  em vez de "aguardar mais dados".
+- Layout do `EQUIP` corrigido contra captura real do latamRO: 67
+  bytes na variante 0x0B0A (sem o byte de Flag final), 68 com
+  grade. Antes assumíamos 68/69 (especificação rAthena master) e
+  toda lista de equip era rejeitada.
+- Layout do `ZC_INVENTORY_END` corrigido: 4 bytes (`u16 op,
+  u8 invType, u8 result`), sem campo de length. A suposição
+  anterior de 6 bytes consumia 2 bytes do pacote seguinte.
+
+
 
 ### Adicionado
 - **Filtro por PID** na tela inicial: a aplicação varre a tabela TCP do
@@ -112,7 +180,8 @@ e o versionamento segue o [Versionamento Semântico](https://semver.org/lang/pt-
 - `opener:allow-open-url` com escopo restrito a Divine Pride, RagCalc,
   RagnaRecap e GitHub (antes era irrestrito)
 
-[Unreleased]: https://github.com/adsonpleal/ragmarket/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/adsonpleal/ragmarket/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/adsonpleal/ragmarket/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/adsonpleal/ragmarket/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/adsonpleal/ragmarket/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/adsonpleal/ragmarket/releases/tag/v0.1.0

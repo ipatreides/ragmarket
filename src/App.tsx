@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { useCapture } from "./hooks/useCapture";
+import { CaptureStatus, useCapture } from "./hooks/useCapture";
 import { useDiscoveredClients } from "./hooks/useDiscoveredClients";
 import { useLatestRelease } from "./hooks/useLatestRelease";
+import { useFavorites } from "./hooks/useFavorites";
+import { useServerPref } from "./hooks/useServerPref";
 import FilterSidebar, { EMPTY_FILTERS, Filters } from "./components/FilterSidebar";
 import ResultsTable from "./components/ResultsTable";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { ClientPicker } from "./components/ClientPicker";
+import { MainTab, MainTabs } from "./components/MainTabs";
+import { MyItemsView } from "./components/MyItemsView";
+import { FavoritesView } from "./components/FavoritesView";
+import { ServerPicker } from "./components/ServerPicker";
 import { setClientSelection } from "./lib/invoke";
+import { openExternal } from "./lib/links";
+import { ALL_INV_TYPES } from "./services/inventoryParser";
 
 const STATUS_LABELS: Record<string, string> = {
   idle: "ocioso",
@@ -18,13 +25,16 @@ const STATUS_LABELS: Record<string, string> = {
 export default function App() {
   const cap = useCapture();
   const update = useLatestRelease();
+  const fav = useFavorites();
+  const { server, setServer } = useServerPref();
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [selectedPid, setSelectedPid] = useState<number | null>(null);
+  const [tab, setTab] = useState<MainTab>("search");
 
-  // Reset filters whenever we go back to the idle screen.
   useEffect(() => {
     if (cap.status === "idle") {
       setFilters(EMPTY_FILTERS);
+      setTab("search");
     }
   }, [cap.status]);
 
@@ -57,6 +67,12 @@ export default function App() {
     });
   }, [cap.records, filters]);
 
+  const mineCount = useMemo(() => {
+    let n = 0;
+    for (const t of ALL_INV_TYPES) n += cap.inventory[t].length;
+    return n;
+  }, [cap.inventory]);
+
   return (
     <div className="app">
       <header className="app-header">
@@ -64,7 +80,10 @@ export default function App() {
           <h1>Ragmarket</h1>
           <p className="subtitle">Visualizador do Catálogo de Vendas</p>
         </div>
-        <div className="status-pill">{STATUS_LABELS[cap.status] ?? cap.status}</div>
+        <div className="app-header-right">
+          <ServerPicker value={server} onChange={setServer} />
+          <div className="status-pill">{STATUS_LABELS[cap.status] ?? cap.status}</div>
+        </div>
       </header>
 
       <main className="app-main">
@@ -84,21 +103,43 @@ export default function App() {
             onSelectPid={setSelectedPid}
           />
         ) : (
-          <FilterScreen
-            status={cap.status}
-            stats={cap.stats}
-            pageCount={cap.pageCount}
-            allRecords={cap.records}
-            filtered={filtered}
-            filters={filters}
-            onFiltersChange={setFilters}
-            onStop={cap.stop}
-            onClear={() => {
-              cap.clearRecords();
-              setFilters(EMPTY_FILTERS);
-            }}
-            onReset={cap.reset}
-          />
+          <>
+            <div className="tab-bar">
+              <MainTabs
+                active={tab}
+                onChange={setTab}
+                counts={{
+                  search: cap.records.length,
+                  mine: mineCount,
+                  favorites: fav.favorites.size,
+                }}
+              />
+              <SessionActions
+                status={cap.status}
+                stats={cap.stats}
+                pageCount={cap.pageCount}
+                hasData={cap.records.length > 0 || mineCount > 0}
+                onStop={cap.stop}
+                onClear={() => {
+                  cap.clearRecords();
+                  setFilters(EMPTY_FILTERS);
+                }}
+                onReset={cap.reset}
+              />
+            </div>
+            {tab === "search" && (
+              <FilterScreen
+                allRecords={cap.records}
+                filtered={filtered}
+                filters={filters}
+                onFiltersChange={setFilters}
+              />
+            )}
+            {tab === "mine" && (
+              <MyItemsView inventory={cap.inventory} server={server} />
+            )}
+            {tab === "favorites" && <FavoritesView server={server} />}
+          </>
         )}
       </main>
 
@@ -114,7 +155,7 @@ function ExtLink({ href, children }: { href: string; children: React.ReactNode }
       className="ext-link"
       onClick={(e) => {
         e.preventDefault();
-        openUrl(href).catch((err) => console.error("[ExtLink] openUrl failed:", err));
+        openExternal(href);
       }}
     >
       {children}
@@ -233,18 +274,11 @@ function IdleScreen(props: {
 }
 
 function FilterScreen(props: {
-  status: "recording" | "stopped";
-  stats: { packets_seen: number; matched: number };
-  pageCount: number;
   allRecords: ReturnType<typeof useCapture>["records"];
   filtered: ReturnType<typeof useCapture>["records"];
   filters: Filters;
   onFiltersChange: (f: Filters) => void;
-  onStop: () => void;
-  onClear: () => void;
-  onReset: () => void;
 }) {
-  const isRecording = props.status === "recording";
   const hasRecords = props.allRecords.length > 0;
 
   return (
@@ -261,20 +295,6 @@ function FilterScreen(props: {
             <span>
               {props.filtered.length} de {props.allRecords.length} resultados
             </span>
-            {isRecording && (
-              <span className="recording-indicator">
-                <span className="dot" /> gravando · {props.pageCount} págs · {props.stats.matched.toLocaleString("pt-BR")} pacotes
-              </span>
-            )}
-          </div>
-          <div className="results-header-actions">
-            {isRecording && (
-              <button onClick={props.onStop}>Parar Gravação</button>
-            )}
-            <button onClick={props.onClear} disabled={!hasRecords}>
-              Limpar
-            </button>
-            <button onClick={props.onReset}>Nova Sessão</button>
           </div>
         </div>
         {hasRecords ? (
@@ -286,21 +306,51 @@ function FilterScreen(props: {
             </div>
           )
         ) : (
-          <div className="empty-state">
-            <div className="empty-state-content">
-              <h3>Aguardando resultados</h3>
-              <p>
-                Abra o <strong>Catálogo de Vendas</strong> dentro do jogo,
-                faça suas buscas e navegue por todas as páginas dos resultados.
-              </p>
-              <p className="muted">
-                Os itens vão aparecer aqui automaticamente conforme os pacotes
-                chegam.
-              </p>
+          <div className="results-scroll">
+            <div className="empty-state">
+              <div className="empty-state-content">
+                <h3>Aguardando resultados</h3>
+                <p>
+                  Abra o <strong>Catálogo de Vendas</strong> dentro do jogo,
+                  faça suas buscas e navegue por todas as páginas dos resultados.
+                </p>
+                <p className="muted">
+                  Os itens vão aparecer aqui automaticamente conforme os pacotes
+                  chegam.
+                </p>
+              </div>
             </div>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function SessionActions(props: {
+  status: Exclude<CaptureStatus, "idle">;
+  stats: { packets_seen: number; matched: number };
+  pageCount: number;
+  hasData: boolean;
+  onStop: () => void;
+  onClear: () => void;
+  onReset: () => void;
+}) {
+  const isRecording = props.status === "recording";
+  return (
+    <div className="session-actions">
+      {isRecording && (
+        <span className="recording-indicator">
+          <span className="dot" /> gravando · {props.pageCount} págs · {props.stats.matched.toLocaleString("pt-BR")} pacotes
+        </span>
+      )}
+      {isRecording && (
+        <button onClick={props.onStop}>Parar Gravação</button>
+      )}
+      <button onClick={props.onClear} disabled={!props.hasData}>
+        Limpar
+      </button>
+      <button onClick={props.onReset}>Nova Sessão</button>
     </div>
   );
 }
