@@ -4,6 +4,9 @@ import { useDiscoveredClients } from "./hooks/useDiscoveredClients";
 import { useLatestRelease } from "./hooks/useLatestRelease";
 import { useFavorites } from "./hooks/useFavorites";
 import { useServerPref } from "./hooks/useServerPref";
+import { useNotifyConfig } from "./hooks/useNotifyConfig";
+import { useWatchers } from "./hooks/useWatchers";
+import { useWatcherScheduler } from "./hooks/useWatcherScheduler";
 import FilterSidebar, { EMPTY_FILTERS, Filters } from "./components/FilterSidebar";
 import ResultsTable from "./components/ResultsTable";
 import { UpdateBanner } from "./components/UpdateBanner";
@@ -22,21 +25,27 @@ const STATUS_LABELS: Record<string, string> = {
   stopped: "parado",
 };
 
+const IDLE_DISABLED_TABS = new Set<MainTab>(["mine"]);
+
 export default function App() {
   const cap = useCapture();
   const update = useLatestRelease();
   const fav = useFavorites();
   const { server, setServer } = useServerPref();
+  const { config: notifyConfig } = useNotifyConfig();
+  const watchers = useWatchers();
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [selectedPid, setSelectedPid] = useState<number | null>(null);
   const [tab, setTab] = useState<MainTab>("search");
 
-  useEffect(() => {
-    if (cap.status === "idle") {
-      setFilters(EMPTY_FILTERS);
-      setTab("search");
-    }
-  }, [cap.status]);
+  const scheduler = useWatcherScheduler({
+    server,
+    favorites: fav.favorites,
+    watchers: watchers.watchers,
+    notifyConfig,
+    setWatcher: watchers.setWatcher,
+    hasEnabledWatchers: watchers.hasEnabledWatchers,
+  });
 
   const handleStart = useCallback(async () => {
     // Lock in the PID filter before capture starts so the very first
@@ -44,6 +53,8 @@ export default function App() {
     await setClientSelection(selectedPid);
     await cap.start();
   }, [cap, selectedPid]);
+
+  const isIdle = cap.status === "idle";
 
   const filtered = useMemo(() => {
     return cap.records.filter((r) => {
@@ -73,6 +84,19 @@ export default function App() {
     return n;
   }, [cap.inventory]);
 
+  const runSchedulerNow = useCallback(() => {
+    void scheduler.runOnce();
+  }, [scheduler]);
+
+  const schedulerProp = useMemo(
+    () => ({
+      lastRun: scheduler.status.lastRun,
+      running: scheduler.status.running,
+      runNow: runSchedulerNow,
+    }),
+    [scheduler.status.lastRun, scheduler.status.running, runSchedulerNow],
+  );
+
   return (
     <div className="app">
       <header className="app-header">
@@ -92,54 +116,58 @@ export default function App() {
         )}
         {cap.error && <div className="error-banner">⚠ {cap.error}</div>}
 
-        {cap.status === "idle" ? (
-          <IdleScreen
-            interfaces={cap.interfaces}
-            selectedIp={cap.selectedIp}
-            onSelectInterface={cap.setSelectedIp}
-            onStart={handleStart}
-            onRefreshInterfaces={cap.refreshInterfaces}
-            selectedPid={selectedPid}
-            onSelectPid={setSelectedPid}
+        <div className="tab-bar">
+          <MainTabs
+            active={tab}
+            onChange={setTab}
+            counts={{
+              search: cap.records.length,
+              mine: mineCount,
+              favorites: fav.favorites.size,
+            }}
+            disabled={isIdle ? IDLE_DISABLED_TABS : undefined}
           />
-        ) : (
-          <>
-            <div className="tab-bar">
-              <MainTabs
-                active={tab}
-                onChange={setTab}
-                counts={{
-                  search: cap.records.length,
-                  mine: mineCount,
-                  favorites: fav.favorites.size,
-                }}
-              />
-              <SessionActions
-                status={cap.status}
-                stats={cap.stats}
-                pageCount={cap.pageCount}
-                hasData={cap.records.length > 0 || mineCount > 0}
-                onStop={cap.stop}
-                onClear={() => {
-                  cap.clearRecords();
-                  setFilters(EMPTY_FILTERS);
-                }}
-                onReset={cap.reset}
-              />
-            </div>
-            {tab === "search" && (
-              <FilterScreen
-                allRecords={cap.records}
-                filtered={filtered}
-                filters={filters}
-                onFiltersChange={setFilters}
-              />
-            )}
-            {tab === "mine" && (
-              <MyItemsView inventory={cap.inventory} server={server} />
-            )}
-            {tab === "favorites" && <FavoritesView server={server} />}
-          </>
+          {cap.status !== "idle" && (
+            <SessionActions
+              status={cap.status}
+              stats={cap.stats}
+              pageCount={cap.pageCount}
+              hasData={cap.records.length > 0 || mineCount > 0}
+              onStop={cap.stop}
+              onClear={() => {
+                cap.clearRecords();
+                setFilters(EMPTY_FILTERS);
+              }}
+              onReset={cap.reset}
+            />
+          )}
+        </div>
+
+        {tab === "search" && (
+          isIdle ? (
+            <IdleScreen
+              interfaces={cap.interfaces}
+              selectedIp={cap.selectedIp}
+              onSelectInterface={cap.setSelectedIp}
+              onStart={handleStart}
+              onRefreshInterfaces={cap.refreshInterfaces}
+              selectedPid={selectedPid}
+              onSelectPid={setSelectedPid}
+            />
+          ) : (
+            <FilterScreen
+              allRecords={cap.records}
+              filtered={filtered}
+              filters={filters}
+              onFiltersChange={setFilters}
+            />
+          )
+        )}
+        {tab === "mine" && !isIdle && (
+          <MyItemsView inventory={cap.inventory} server={server} />
+        )}
+        {tab === "favorites" && (
+          <FavoritesView server={server} scheduler={schedulerProp} />
         )}
       </main>
 

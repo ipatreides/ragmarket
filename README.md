@@ -13,7 +13,12 @@ cliente enquanto você joga latamRO e decodifica:
   cabeçalho), persistidos entre sessões e com links rápidos para o
   Divine Pride e para a busca do Mercado. Botão **Atualizar preços**
   busca o **Mín** e **Máx** atuais do Catálogo de Vendas para cada
-  favorito.
+  favorito, e cada linha tem um botão de sino que abre um modal para
+  configurar um **alerta de preço**: quando o mínimo cai para o valor
+  alvo ou menos, o app dispara uma notificação por **push (ntfy.sh)**
+  e/ou **toast nativo do Windows**. O agendador roda local enquanto a
+  janela está aberta; a aba funciona inteira mesmo antes de iniciar
+  a gravação.
 
 Somente leitura: cada byte exibido vem do servidor para o seu próprio cliente.
 Nenhum pacote é construído ou enviado. Nenhuma proteção anti-cheat é
@@ -21,7 +26,7 @@ atravessada.
 
 ## ⬇ Download
 
-[**ragmarket-v0.4.0-setup.exe**](https://github.com/adsonpleal/ragmarket/releases/latest/download/ragmarket-v0.4.0-setup.exe)
+[**ragmarket-v0.5.0-setup.exe**](https://github.com/adsonpleal/ragmarket/releases/latest/download/ragmarket-v0.5.0-setup.exe)
 — instalador único para Windows 10/11 (~10 MB). Já inclui o WinDivert
 embutido; basta executar e seguir o instalador. O Ragmarket é configurado
 para sempre rodar como Administrador (vai aparecer um UAC ao iniciar — isso
@@ -110,12 +115,19 @@ Não. Tudo é processado localmente. O Ragmarket:
   As listas decodificadas são as buscas do catálogo e os dumps de
   contêiner (inventário, carrinho, armazém) que o servidor manda pro
   seu próprio cliente.
-- Favoritos e a preferência de servidor ficam só no `localStorage` da
+- Favoritos, preferência de servidor, tópico do ntfy e os watchers de
+  preço (alvo + estado do dedup) ficam todos só no `localStorage` da
   janela do app, no seu computador.
-- Não envia nenhum dado para servidores externos, exceto quando você
-  **clica em um link de item**: o Divine Pride é consultado com o ID
-  do item e a busca do Mercado é aberta com o nome do item — ambos no
-  seu navegador padrão, sem credenciais.
+- O app faz chamadas para fora em três situações, sempre sem
+  credenciais: (a) quando você **clica em um link**, abre Divine Pride
+  ou a busca do Mercado no seu navegador padrão; (b) quando você clica
+  em **Atualizar preços** ou o agendador de alertas roda, o backend
+  Rust consulta o Catálogo de Vendas do gnjoylatam (a mesma URL pública
+  que o link de Mercado abre); (c) quando o canal **Push (ntfy.sh)**
+  está ligado e um alerta dispara, o app faz um POST para
+  `https://ntfy.sh/` com o tópico que você configurou, o nome do item
+  e o preço. O tópico é o seu segredo — escolha algo difícil de
+  adivinhar.
 
 ### 8. Funciona em outros servidores de RO?
 

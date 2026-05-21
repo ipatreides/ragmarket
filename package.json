@@ -1,7 +1,7 @@
 {
   "name": "ragmarket",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@tanstack/react-table": "^8.20.5",
     "@tauri-apps/api": "^2.1.1",
+    "@tauri-apps/plugin-notification": "^2",
     "@tauri-apps/plugin-opener": "^2.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

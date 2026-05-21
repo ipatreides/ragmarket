@@ -17,12 +17,14 @@ type Options<T> = {
  * event (the browser only fires `storage` in OTHER windows, so we'd
  * otherwise miss intra-window writes).
  */
+type Updater<T> = T | ((prev: T) => T);
+
 export function usePersistentValue<T>({
   key,
   defaultValue,
   parse,
   serialize,
-}: Options<T>): [T, (v: T) => void] {
+}: Options<T>): [T, (next: Updater<T>) => void] {
   const changeEvent = `ragmarket:persistent-changed:${key}`;
 
   const load = useCallback((): T => {
@@ -51,15 +53,26 @@ export function usePersistentValue<T>({
     };
   }, [key, changeEvent, load]);
 
+  // Accepts a value OR an updater (React-style). Updater form is the
+  // only way to safely apply multiple writes that resolve in parallel
+  // (e.g. a Promise.all of scheduler tasks each patching one entry of
+  // a shared map) — value form reads from the captured closure and
+  // silently drops concurrent writes. If the updater returns the same
+  // reference, skip the write so consumers don't re-render.
   const update = useCallback(
-    (next: T) => {
-      setValue(next);
-      try {
-        localStorage.setItem(key, serialize(next));
-      } catch {
-        // Quota / unavailable — non-critical for this app.
-      }
-      window.dispatchEvent(new Event(changeEvent));
+    (next: Updater<T>) => {
+      setValue((prev) => {
+        const computed =
+          typeof next === "function" ? (next as (p: T) => T)(prev) : next;
+        if (Object.is(computed, prev)) return prev;
+        try {
+          localStorage.setItem(key, serialize(computed));
+        } catch {
+          // Quota / unavailable — non-critical for this app.
+        }
+        window.dispatchEvent(new Event(changeEvent));
+        return computed;
+      });
     },
     [key, changeEvent, serialize],
   );

@@ -2,13 +2,24 @@ import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { createColumnHelper } from "@tanstack/react-table";
 import { useFavorites } from "../hooks/useFavorites";
 import { useItemNames } from "../hooks/useItemNames";
+import { useWatchers, type WatcherEntry } from "../hooks/useWatchers";
 import { dpUrl, marketUrl, openExternal, Server } from "../lib/links";
 import { fetchMarketExtremes } from "../lib/invoke";
+import { runPool } from "../lib/runPool";
 import { SortableTable } from "./SortableTable";
 import { starColumn } from "./itemColumns";
+import { FavoritesNotifyBar } from "./FavoritesNotifyBar";
+import { WatcherSetupModal } from "./WatcherSetupModal";
+
+export type SchedulerStatus = {
+  lastRun: number | null;
+  running: boolean;
+  runNow: () => void;
+};
 
 type Props = {
   server: Server;
+  scheduler: SchedulerStatus;
 };
 
 type FetchStatus = "idle" | "loading" | "error";
@@ -26,6 +37,7 @@ type FavRow = {
   max: number | null;
   status: FetchStatus;
   error?: string;
+  watcher: WatcherEntry | null;
 };
 
 const ch = createColumnHelper<FavRow>();
@@ -58,34 +70,9 @@ function externalLinkCell(href: string, label: string, title: string): ReactNode
   );
 }
 
-// Run `tasks` with at most `concurrency` in flight. Returns when all
-// settle.
-async function runPool<T>(
-  tasks: Array<() => Promise<T>>,
-  concurrency: number,
-): Promise<void> {
-  let cursor = 0;
-  const workers: Promise<void>[] = [];
-  for (let w = 0; w < Math.min(concurrency, tasks.length); w++) {
-    workers.push(
-      (async () => {
-        while (true) {
-          const i = cursor++;
-          if (i >= tasks.length) return;
-          try {
-            await tasks[i]();
-          } catch {
-            // task is responsible for storing its own error state
-          }
-        }
-      })(),
-    );
-  }
-  await Promise.all(workers);
-}
-
-export function FavoritesView({ server }: Props) {
+export function FavoritesView({ server, scheduler }: Props) {
   const fav = useFavorites();
+  const watchers = useWatchers();
   const ids = useMemo(() => Array.from(fav.favorites), [fav.favorites]);
   const names = useItemNames(ids);
 
@@ -93,6 +80,7 @@ export function FavoritesView({ server }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [addInput, setAddInput] = useState("");
   const [addFeedback, setAddFeedback] = useState<string | null>(null);
+  const [editingWatcherId, setEditingWatcherId] = useState<number | null>(null);
   const feedbackTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -121,9 +109,10 @@ export function FavoritesView({ server }: Props) {
         max: p?.max ?? null,
         status: p?.status ?? "idle",
         error: p?.error,
+        watcher: watchers.get(id),
       };
     });
-  }, [sorted, names, prices]);
+  }, [sorted, names, prices, watchers]);
 
   const setPrice = useCallback(
     (id: number, next: PriceState) => {
@@ -225,6 +214,34 @@ export function FavoritesView({ server }: Props) {
         cell: (info) => priceCell(info.row.original, info.row.original.max),
       }),
       ch.display({
+        id: "alerta",
+        header: "Alerta",
+        cell: (info) => {
+          const r = info.row.original;
+          const w = r.watcher;
+          const icon = w && !w.enabled ? "🔕" : "🔔";
+          const state = !w ? "is-empty" : w.enabled ? "is-on" : "is-off";
+          const labelText = w
+            ? w.targetPrice.toLocaleString("pt-BR")
+            : "Configurar";
+          return (
+            <button
+              type="button"
+              className={`watcher-button ${state}`}
+              onClick={() => setEditingWatcherId(r.itemID)}
+              title={
+                w
+                  ? `Alvo ${w.targetPrice.toLocaleString("pt-BR")} z — clique para editar`
+                  : "Configurar alerta de preço"
+              }
+            >
+              <span className="watcher-button__icon">{icon}</span>
+              <span className="watcher-button__label">{labelText}</span>
+            </button>
+          );
+        },
+      }),
+      ch.display({
         id: "dp",
         header: "DP",
         cell: (info) =>
@@ -260,9 +277,23 @@ export function FavoritesView({ server }: Props) {
     </form>
   );
 
+  const editingRow = editingWatcherId !== null
+    ? rows.find((r) => r.itemID === editingWatcherId) ?? null
+    : null;
+
+  const notifyBar = (
+    <FavoritesNotifyBar
+      enabledCount={watchers.enabledCount}
+      schedulerLastRun={scheduler.lastRun}
+      schedulerRunning={scheduler.running}
+      onRunNow={scheduler.runNow}
+    />
+  );
+
   if (ids.length === 0) {
     return (
       <div className="favorites-pane">
+        {notifyBar}
         <div className="results-header">
           <div className="results-header-left">
             <span>0 favoritos</span>
@@ -289,6 +320,7 @@ export function FavoritesView({ server }: Props) {
 
   return (
     <div className="favorites-pane">
+      {notifyBar}
       <div className="results-header">
         <div className="results-header-left">
           <span>{ids.length} favoritos</span>
@@ -312,6 +344,19 @@ export function FavoritesView({ server }: Props) {
           initialSort={[{ id: "name", desc: false }]}
         />
       </div>
+      {editingRow && (
+        <WatcherSetupModal
+          itemId={editingRow.itemID}
+          itemName={editingRow.name}
+          currentMin={editingRow.min}
+          existing={editingRow.watcher}
+          onSave={({ enabled, targetPrice }) =>
+            watchers.setWatcher(editingRow.itemID, { enabled, targetPrice })
+          }
+          onRemove={() => watchers.removeWatcher(editingRow.itemID)}
+          onClose={() => setEditingWatcherId(null)}
+        />
+      )}
     </div>
   );
 }

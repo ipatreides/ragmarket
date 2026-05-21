@@ -13,6 +13,7 @@
     "core:app:default",
     "opener:default",
     "dialog:default",
+    "notification:default",
     {
       "identifier": "opener:allow-open-url",
       "allow": [
@@ -21,7 +22,9 @@
         { "url": "https://ro.gnjoylatam.com/**" },
         { "url": "https://ragcalc.web.app/**" },
         { "url": "https://ragnarecap.web.app/**" },
-        { "url": "https://github.com/**" }
+        { "url": "https://github.com/**" },
+        { "url": "https://ntfy.sh/**" },
+        { "url": "https://docs.ntfy.sh/**" }
       ]
     }
   ]

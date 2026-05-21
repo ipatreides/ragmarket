@@ -7,6 +7,76 @@ e o versionamento segue o [Versionamento Semântico](https://semver.org/lang/pt-
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-21
+
+### Adicionado
+- **Alertas de preço por item nos Favoritos**: cada favorito ganhou
+  um botão de sino que abre um modal para configurar um `preço alvo`.
+  Um agendador local (intervalo de 30 s a 3600 s, default 300 s) roda
+  `fetch_market_extremes` para cada favorito com alerta ativo e
+  dispara notificação quando o mínimo do Mercado fica ≤ ao alvo. A
+  semântica de dedup espelha o
+  [notifymarket](https://github.com/adsonpleal/notifymarket): só
+  re-alerta quando o preço cai estritamente mais; reseta o marcador
+  quando volta a subir acima do alvo.
+- **Dois canais de notificação**: push **ntfy.sh** (envia para o app
+  no celular via tópico que você escolhe — sem cadastro, sem chave de
+  API) e **toast nativo do Windows** via `tauri-plugin-notification`.
+  Toggles independentes; cada canal tem botão **Testar** com feedback
+  inline e o ntfy tem um botão **?** com instruções de configuração
+  (`WatcherHelpModal`).
+- **Painel "Notificações"** no cabeçalho dos Favoritos: tópico ntfy,
+  toggle do Windows, intervalo em segundos, contador de alertas
+  ativos, "última checagem há …" e botão **"Verificar agora"** que
+  dispara um ciclo na mão — essencial para testar e para quem não
+  quer esperar o próximo tick.
+- **Logger de opcodes** opt-in via `RAGMARKET_LOG_OPCODES=1`: grava
+  uma linha por pacote de mercado/inventário em
+  `%LOCALAPPDATA%\com.adson.ragmarket\logs\opcodes-YYYY-MM-DD.log`
+  com rotação diária, timestamps ISO e direção S→C / C→S inferida do
+  `is_target_port`. Espelha o `RAGLENS_LOG_OPCODES` do
+  [raglens](https://github.com/adsonpleal/raglens) para o mesmo
+  fluxo de `Get-Content -Tail -Wait` enquanto se reproduz um cenário
+  no jogo. Desligado por default; sem mudança de comportamento em
+  builds de produção.
+
+### Alterado
+- **Aba Favoritos acessível sem gravação ativa**: a barra de abas
+  agora aparece também na tela ociosa. Catálogo e Meus Itens ficam
+  desabilitados visualmente até iniciar a captura, mas Favoritos
+  funciona inteiro — adicionar por ID, atualizar preços, configurar
+  alertas. A aba default ao abrir o app é Favoritos.
+- **Sufixo de slot `[N]` removido na hora de buscar**: o Mercado do
+  gnjoylatam não tokeniza os colchetes, então "Espada [3]" retornava
+  zero resultados. Novo helper `stripSlotSuffix` em
+  `src/lib/itemName.ts` aplicado em dois chokepoints — `marketUrl`
+  (link Mercado) e o wrapper `fetchMarketExtremes` (botão Atualizar
+  preços + agendador de alertas) — então a exibição mantém o "[3]" e
+  só o termo de busca enviado fica limpo.
+- **Allowlist do `opener`** estendida com `ntfy.sh` e `docs.ntfy.sh`
+  para os links clicáveis no `WatcherHelpModal`.
+
+### Corrigido
+- `usePersistentValue` agora aceita funções atualizadoras
+  (`setX(prev => ...)`) além de valores diretos. Sem isso, chamadas
+  paralelas a `setWatcher` partindo de tasks concorrentes do
+  agendador (`runPool` com concorrência 4) liam todas o mesmo
+  snapshot de `watchers` via closure e sobrescreviam silenciosamente
+  os updates de `lastAlertedPrice` umas das outras. Todos os
+  consumidores existentes (`useFavorites`, `useServerPref`) seguem
+  compatíveis com a API antiga.
+
+### Performance
+- `usePersistentValue` short-circuita gravações que retornam a mesma
+  referência (`Object.is(prev, next)`) — nem grava no `localStorage`
+  nem dispara o evento de sincronização entre janelas. Combinado com
+  a checagem de igualdade estrutural em `useWatchers.setWatcher`,
+  ticks do agendador que não mudam nada param de re-renderizar a
+  `FavoritesView`.
+- Agendador de alertas só arma o `setInterval` quando há pelo menos
+  um canal habilitado **e** pelo menos um watcher ativo. App sem
+  alertas configurados não dispara nenhum timer.
+
 ## [0.4.0] - 2026-05-20
 
 ### Adicionado
@@ -231,7 +301,8 @@ e o versionamento segue o [Versionamento Semântico](https://semver.org/lang/pt-
 - `opener:allow-open-url` com escopo restrito a Divine Pride, RagCalc,
   RagnaRecap e GitHub (antes era irrestrito)
 
-[Unreleased]: https://github.com/adsonpleal/ragmarket/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/adsonpleal/ragmarket/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/adsonpleal/ragmarket/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/adsonpleal/ragmarket/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/adsonpleal/ragmarket/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/adsonpleal/ragmarket/compare/v0.1.1...v0.2.0

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ClientInfo } from "./types";
+import { stripSlotSuffix } from "./itemName";
 import type { Server } from "./links";
 
 export function discoverClients(): Promise<ClientInfo[]> {
@@ -17,7 +18,11 @@ export function fetchMarketExtremes(
   itemName: string,
   server: Server,
 ): Promise<MarketExtremes> {
-  return invoke("fetch_market_extremes", { itemId, itemName, server });
+  return invoke("fetch_market_extremes", {
+    itemId,
+    itemName: stripSlotSuffix(itemName),
+    server,
+  });
 }
 
 export type SaveFilter = { name: string; extensions: string[] };
