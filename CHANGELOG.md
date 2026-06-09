@@ -7,6 +7,21 @@ e o versionamento segue o [Versionamento Semântico](https://semver.org/lang/pt-
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-08
+
+### Adicionado
+- **Alerta de preço abre o Mercado ao tocar**: a notificação push
+  (ntfy) dos alertas de Favoritos agora carrega um link de clique
+  (`click`) apontando para a busca do Catálogo de Vendas do gnjoylatam
+  do item — tocar a notificação no celular abre direto a listagem,
+  espelhando o link **Mercado** de dentro do app. Novo campo opcional
+  `click` em `NtfyMessage` (`src/lib/notify/ntfy.ts`), preenchido pelo
+  agendador via `marketUrl(name, server)`
+  (`src/hooks/useWatcherScheduler.ts`). O toast nativo do Windows não
+  recebe alvo de clique: no desktop o `tauri-plugin-notification` só
+  repassa título/corpo/ícone/som ao `notify-rust`, então clicar nele
+  apenas foca o app.
+
 ## [0.5.0] - 2026-05-21
 
 ### Adicionado
@@ -301,7 +316,8 @@ e o versionamento segue o [Versionamento Semântico](https://semver.org/lang/pt-
 - `opener:allow-open-url` com escopo restrito a Divine Pride, RagCalc,
   RagnaRecap e GitHub (antes era irrestrito)
 
-[Unreleased]: https://github.com/adsonpleal/ragmarket/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/adsonpleal/ragmarket/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/adsonpleal/ragmarket/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/adsonpleal/ragmarket/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/adsonpleal/ragmarket/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/adsonpleal/ragmarket/compare/v0.2.0...v0.3.0

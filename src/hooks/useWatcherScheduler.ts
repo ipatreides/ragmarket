@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchMarketExtremes } from "../lib/invoke";
-import type { Server } from "../lib/links";
+import { marketUrl, type Server } from "../lib/links";
 import { runPool } from "../lib/runPool";
 import { evaluateWatcher } from "../lib/notify/evaluator";
 import { sendNtfyPush } from "../lib/notify/ntfy";
@@ -79,6 +79,7 @@ export function useWatcherScheduler({
             body,
             priority: "high",
             tags: ["moneybag"],
+            click: marketUrl(name, server),
           });
         }
         if (notifyConfig.winEnabled) {

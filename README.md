@@ -16,7 +16,8 @@ cliente enquanto você joga latamRO e decodifica:
   favorito, e cada linha tem um botão de sino que abre um modal para
   configurar um **alerta de preço**: quando o mínimo cai para o valor
   alvo ou menos, o app dispara uma notificação por **push (ntfy.sh)**
-  e/ou **toast nativo do Windows**. O agendador roda local enquanto a
+  e/ou **toast nativo do Windows**. Tocar a notificação push no celular
+  abre direto a busca do item no Mercado. O agendador roda local enquanto a
   janela está aberta; a aba funciona inteira mesmo antes de iniciar
   a gravação.
 
@@ -26,7 +27,7 @@ atravessada.
 
 ## ⬇ Download
 
-[**ragmarket-v0.5.0-setup.exe**](https://github.com/adsonpleal/ragmarket/releases/latest/download/ragmarket-v0.5.0-setup.exe)
+[**ragmarket-v0.6.0-setup.exe**](https://github.com/adsonpleal/ragmarket/releases/latest/download/ragmarket-v0.6.0-setup.exe)
 — instalador único para Windows 10/11 (~10 MB). Já inclui o WinDivert
 embutido; basta executar e seguir o instalador. O Ragmarket é configurado
 para sempre rodar como Administrador (vai aparecer um UAC ao iniciar — isso
@@ -125,9 +126,10 @@ Não. Tudo é processado localmente. O Ragmarket:
   Rust consulta o Catálogo de Vendas do gnjoylatam (a mesma URL pública
   que o link de Mercado abre); (c) quando o canal **Push (ntfy.sh)**
   está ligado e um alerta dispara, o app faz um POST para
-  `https://ntfy.sh/` com o tópico que você configurou, o nome do item
-  e o preço. O tópico é o seu segredo — escolha algo difícil de
-  adivinhar.
+  `https://ntfy.sh/` com o tópico que você configurou, o nome do item,
+  o preço e um link de clique para a busca pública do item no Mercado
+  (a mesma URL do gnjoylatam que o link de Mercado abre). O tópico é o
+  seu segredo — escolha algo difícil de adivinhar.
 
 ### 8. Funciona em outros servidores de RO?
 

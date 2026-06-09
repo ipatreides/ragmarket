@@ -20,6 +20,11 @@ export type NtfyMessage = {
   body: string;
   priority?: NtfyPriority;
   tags?: string[];
+  /**
+   * URL opened when the notification is tapped in the ntfy app — mirrors
+   * the in-app "Mercado" link so an alert leads straight to the listing.
+   */
+  click?: string;
 };
 
 const PRIORITY_VALUE: Record<NtfyPriority, number> = {
@@ -41,6 +46,7 @@ export async function sendNtfyPush(
       message: msg.body,
       priority: PRIORITY_VALUE[msg.priority ?? "default"],
       tags: msg.tags ?? [],
+      ...(msg.click ? { click: msg.click } : {}),
     });
     const res = await fetch(`${NTFY_BASE}/`, {
       method: "POST",
