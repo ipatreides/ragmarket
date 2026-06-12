@@ -53,6 +53,7 @@ pub fn run() {
             connections::discover_clients_cmd,
             connections::set_client_selection,
             market::fetch_market_extremes,
+            market::fetch_market_listings,
             files::save_text_file,
         ])
         .run(tauri::generate_context!())

@@ -25,6 +25,30 @@ export function fetchMarketExtremes(
   });
 }
 
+export type MarketListing = { price: number; amount: number };
+
+export type MarketListingsResult = {
+  // Cheapest listings for the item, ascending by price.
+  listings: MarketListing[];
+  // Upstream search total — substring match on the name, so it can count
+  // other items' rows too. Pagination metadata, never shown as an item count.
+  totalCount: number;
+  // True when more (more expensive) listings exist than were fetched.
+  truncated: boolean;
+};
+
+export function fetchMarketListings(
+  itemId: number,
+  itemName: string,
+  server: Server,
+): Promise<MarketListingsResult> {
+  return invoke("fetch_market_listings", {
+    itemId,
+    itemName: stripSlotSuffix(itemName),
+    server,
+  });
+}
+
 export type SaveFilter = { name: string; extensions: string[] };
 
 // Opens a native "save as…" dialog and writes `contents` to the chosen

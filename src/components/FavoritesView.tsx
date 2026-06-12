@@ -10,6 +10,7 @@ import { SortableTable } from "./SortableTable";
 import { starColumn } from "./itemColumns";
 import { FavoritesNotifyBar } from "./FavoritesNotifyBar";
 import { WatcherSetupModal } from "./WatcherSetupModal";
+import { PriceDistributionModal } from "./PriceDistributionModal";
 
 export type SchedulerStatus = {
   lastRun: number | null;
@@ -81,6 +82,7 @@ export function FavoritesView({ server, scheduler }: Props) {
   const [addInput, setAddInput] = useState("");
   const [addFeedback, setAddFeedback] = useState<string | null>(null);
   const [editingWatcherId, setEditingWatcherId] = useState<number | null>(null);
+  const [chartItemId, setChartItemId] = useState<number | null>(null);
   const feedbackTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -250,12 +252,27 @@ export function FavoritesView({ server, scheduler }: Props) {
       ch.display({
         id: "market",
         header: "Mercado",
-        cell: (info) =>
-          externalLinkCell(
-            marketUrl(info.row.original.name, server),
-            "Mercado",
-            "Buscar no Mercado (Catálogo de Vendas)",
-          ),
+        cell: (info) => {
+          const r = info.row.original;
+          return (
+            <span className="market-cell">
+              {externalLinkCell(
+                marketUrl(r.name, server),
+                "Mercado",
+                "Buscar no Mercado (Catálogo de Vendas)",
+              )}
+              <button
+                type="button"
+                className="chart-button"
+                onClick={() => setChartItemId(r.itemID)}
+                title="Ver distribuição de preços dos anúncios"
+                aria-label={`Distribuição de preços de ${r.name}`}
+              >
+                📊
+              </button>
+            </span>
+          );
+        },
       }),
     ],
     [fav.isFavorite, fav.toggle, server],
@@ -279,6 +296,10 @@ export function FavoritesView({ server, scheduler }: Props) {
 
   const editingRow = editingWatcherId !== null
     ? rows.find((r) => r.itemID === editingWatcherId) ?? null
+    : null;
+
+  const chartRow = chartItemId !== null
+    ? rows.find((r) => r.itemID === chartItemId) ?? null
     : null;
 
   const notifyBar = (
@@ -355,6 +376,14 @@ export function FavoritesView({ server, scheduler }: Props) {
           }
           onRemove={() => watchers.removeWatcher(editingRow.itemID)}
           onClose={() => setEditingWatcherId(null)}
+        />
+      )}
+      {chartRow && (
+        <PriceDistributionModal
+          itemId={chartRow.itemID}
+          itemName={chartRow.name}
+          server={server}
+          onClose={() => setChartItemId(null)}
         />
       )}
     </div>

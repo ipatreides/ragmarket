@@ -951,3 +951,102 @@ button.ghost {
   background: transparent;
   color: #aaa;
 }
+
+/* ---- Market depth (price distribution modal) ---- */
+
+.market-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-button {
+  padding: 1px 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: transparent;
+  border-color: #2c2c2c;
+  border-radius: 4px;
+}
+
+.depth-content {
+  width: 520px;
+  max-width: 100%;
+}
+
+.depth-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: #14141a;
+  border: 1px solid #2a2a36;
+  border-radius: 6px;
+}
+
+.depth-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.depth-stat__label {
+  font-size: 11px;
+  color: #888;
+}
+
+.depth-stat__value {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.depth-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 45vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.depth-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 128px 80px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.depth-row__price {
+  text-align: right;
+}
+
+.depth-row__meta {
+  color: #b8b8c4;
+  white-space: nowrap;
+}
+
+.depth-row__cum {
+  color: #888;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.depth-bar {
+  height: 10px;
+  background: #14141a;
+  border: 1px solid #2a2a36;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.depth-bar__fill {
+  height: 100%;
+  background: #2a4078;
+}
+
+.depth-note {
+  font-size: 11px;
+  color: #888;
+}
