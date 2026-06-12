@@ -27,7 +27,7 @@ atravessada.
 
 ## ⬇ Download
 
-[**ragmarket-v0.6.0-setup.exe**](https://github.com/adsonpleal/ragmarket/releases/latest/download/ragmarket-v0.6.0-setup.exe)
+[**ragmarket-v0.7.0-setup.exe**](https://github.com/adsonpleal/ragmarket/releases/latest/download/ragmarket-v0.7.0-setup.exe)
 — instalador único para Windows 10/11 (~10 MB). Já inclui o WinDivert
 embutido; basta executar e seguir o instalador. O Ragmarket é configurado
 para sempre rodar como Administrador (vai aparecer um UAC ao iniciar — isso

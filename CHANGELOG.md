@@ -7,6 +7,31 @@ e o versionamento segue o [Versionamento Semântico](https://semver.org/lang/pt-
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-11
+
+### Adicionado
+- **Distribuição de preços do Mercado nos Favoritos**: novo botão 📊
+  ao lado do link **Mercado** de cada favorito abre um modal com os
+  anúncios atuais agrupados por preço exato — barra proporcional às
+  unidades, contagem de anúncios e acumulado de unidades até cada
+  nível, respondendo "se eu cobrar X, quantas unidades vendem antes
+  da minha?". Resumo no topo com mínimo, mediana ponderada por
+  unidade, total de unidades e de anúncios; estados de carregando /
+  erro com "Tentar novamente" / vazio (com dica quando o nome do item
+  é desconhecido) e aviso quando a lista está truncada. Agrupamento
+  por preço exato de propósito: undercut de 1z fica visível.
+- Novo comando Rust `fetch_market_listings`: pagina a busca
+  `LOW_PRICE` do gnjoylatam (até 5 páginas ≈ 100 anúncios mais
+  baratos — o lado que importa para decidir o próprio preço), captura
+  `itemPrice`/`itemCnt` de cada anúncio, filtra por `itemId` (a busca
+  é por substring do nome), dedupa por `ssi` entre páginas e reordena
+  por preço. Falha numa página intermediária mantém o maior prefixo
+  sem buracos (um buraco corromperia o acumulado) e marca
+  `truncated`. Agregação (níveis de preço, mediana ponderada) em
+  `src/lib/marketDepth.ts` com testes vitest; parsing com testes de
+  unidade em `market.rs`, incluindo uma linha verbatim do payload
+  real.
+
 ## [0.6.0] - 2026-06-08
 
 ### Adicionado
@@ -316,7 +341,8 @@ e o versionamento segue o [Versionamento Semântico](https://semver.org/lang/pt-
 - `opener:allow-open-url` com escopo restrito a Divine Pride, RagCalc,
   RagnaRecap e GitHub (antes era irrestrito)
 
-[Unreleased]: https://github.com/adsonpleal/ragmarket/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/adsonpleal/ragmarket/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/adsonpleal/ragmarket/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/adsonpleal/ragmarket/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/adsonpleal/ragmarket/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/adsonpleal/ragmarket/compare/v0.3.0...v0.4.0
